@@ -1,0 +1,17 @@
+# Local editor and operating system files
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python thumbnail generation files
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Do not publish captured frames from source videos
+assets/thumbnails/

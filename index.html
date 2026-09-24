@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111d2b">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <title>티키토키 연속 재생</title>
+  <link rel="stylesheet" href="styles.css?v=9">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="video-sidebar" aria-label="영상 선택">
+      <div class="side-head">
+        <div class="brand-row">
+          <div class="brand"><span class="brand-mark" aria-hidden="true">▶</span> TIKITOKI PLAYER</div>
+          <button class="settings-button" id="settings-button" type="button" aria-label="재생 설정" aria-controls="settings-panel" aria-expanded="false">⚙</button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="영상 레벨">
+          <button class="tab" type="button" role="tab" data-level="all" aria-selected="true">전체</button>
+          <button class="tab" type="button" role="tab" data-level="Level 1 · Unit 7" aria-selected="false">레벨 1</button>
+          <button class="tab" type="button" role="tab" data-level="Level 2 · Unit 7" aria-selected="false">레벨 2</button>
+          <button class="tab" type="button" role="tab" data-level="Level 3 · Unit 7" aria-selected="false">레벨 3</button>
+        </div>
+        <div class="selection-bar">
+          <span class="selection-count" id="selection-count">0개 선택</span>
+          <div class="text-actions">
+            <button class="text-button" id="select-all" type="button">보이는 영상 선택</button>
+            <button class="text-button" id="clear-all" type="button">선택 해제</button>
+            <button class="text-button danger" id="delete-selected" type="button" disabled>선택 삭제</button>
+          </div>
+        </div>
+        <div class="settings-panel" id="settings-panel" hidden>
+          <label class="repeat-control" for="repeat-count">목록 재생 횟수
+            <select id="repeat-count">
+              <option value="1">1번</option><option value="2">2번</option><option value="3">3번</option>
+              <option value="5">5번</option><option value="10">10번</option><option value="0">계속 반복</option>
+            </select>
+          </label>
+          <button class="restore-button" id="restore-deleted" type="button" disabled>삭제한 영상 복원</button>
+        </div>
+      </div>
+      <div class="list" id="video-list"></div>
+      <div class="side-footer">
+        <button class="footer-play" id="play-button" type="button" aria-label="선택 영상 재생" disabled><span aria-hidden="true">▶</span> <span id="play-label">선택 영상 재생</span></button>
+      </div>
+    </aside>
+    <div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
+    <button class="drawer-toggle" id="playlist-toggle" type="button" aria-label="재생목록 닫기" aria-controls="video-sidebar" aria-expanded="true">❮</button>
+
+    <main class="main" aria-label="영상 재생">
+        <a class="source-link" id="source-link" href="https://tikitoki.ebsnurisam.com/" target="_blank" rel="noopener noreferrer">원본 사이트 ↗</a>
+        <div class="content-info" aria-live="polite">
+          <span class="eyebrow" id="level-label">재생 대기</span>
+          <strong class="video-title" id="now-title">선택한 영상 없음</strong>
+        </div>
+        <div class="player-shell">
+          <iframe id="player" title="티키토키 영상 플레이어" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen hidden></iframe>
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon" aria-hidden="true">▶</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="secondary" id="playback-button" type="button" aria-label="재생" disabled>
+            <span class="desktop-label" id="playback-label">재생</span><span class="mobile-icon playback-icon" id="playback-icon" aria-hidden="true">▶</span>
+          </button>
+          <button class="secondary" id="next-button" type="button" aria-label="다음 영상" disabled>
+            <span class="desktop-label">다음 영상 →</span><span class="mobile-icon next-icon" aria-hidden="true">⏭</span>
+          </button>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite">영상을 선택하면 재생할 수 있습니다.</p>
+    </main>
+  </div>
+
+  <script src="https://player.vimeo.com/api/player.js"></script>
+  <script>
+    const videos = [
+      { id: 'VSK1213', level: 'Level 1 · Unit 7', title: '[Animation] How Exciting', vimeo: '569703644' },
+      { id: 'VSK1214', level: 'Level 1 · Unit 7', title: '[Storybook] How Exciting', vimeo: '569703794' },
+      { id: 'VSK1215', level: 'Level 1 · Unit 7', title: '[Song] Row, Row, Row Your Boat', vimeo: '569703764' },
+      { id: 'VSK1216', level: 'Level 1 · Unit 7', title: '[Song] The Wheels on the Bus', vimeo: '569703881' },
+      { id: 'VSK1217', level: 'Level 1 · Unit 7', title: '[Phonics(Reading)] Letters p, q, r', vimeo: '569703910' },
+      { id: 'VSK1218', level: 'Level 1 · Unit 7', title: '[Phonics(Chant)] Letters p, q, r', vimeo: '570110433' },
+      { id: 'VSK1219', level: 'Level 1 · Unit 7', title: '[Daily Song] Weather Song', vimeo: '569703972' },
+      { id: 'VSK1220', level: 'Level 1 · Unit 7', title: '[Daily Song] Five Little Monkeys', vimeo: '569705070' },
+      { id: 'VSK1221', level: 'Level 2 · Unit 7', title: '[북챈트1] Are You Wearing a Helmet?', vimeo: '571049942' },
+      { id: 'VSK1222', level: 'Level 2 · Unit 7', title: '[북챈트2] Are You Wearing a Helmet?', vimeo: '571049967' },
+      { id: 'VSK1223', level: 'Level 2 · Unit 7', title: '[북챈트3] Are You Wearing a Helmet?', vimeo: '571049990' },
+      { id: 'VSK1224', level: 'Level 2 · Unit 7', title: '[북챈트1] What Shape Is It?', vimeo: '571050082' },
+      { id: 'VSK1225', level: 'Level 2 · Unit 7', title: '[북챈트2] What Shape Is It?', vimeo: '571050106' },
+      { id: 'VSK1226', level: 'Level 2 · Unit 7', title: '[북챈트3] What Shape Is It?', vimeo: '571050145' },
+      { id: 'VSK1227', level: 'Level 2 · Unit 7', title: '[Animation] Safety Park', vimeo: '569705187' },
+      { id: 'VSK1228', level: 'Level 2 · Unit 7', title: '[Storybook] Safety Park', vimeo: '569705380' },
+      { id: 'VSK1230', level: 'Level 2 · Unit 7', title: '[Song] I Love the Mountains', vimeo: '569705499' },
+      { id: 'VSK1231', level: 'Level 2 · Unit 7', title: '[Phonics] Short Vowel a', vimeo: '569705599' },
+      { id: 'VSK1232', level: 'Level 2 · Unit 7', title: '[Phonics] Short Vowel e', vimeo: '569705678' },
+      { id: 'VSK1235', level: 'Level 3 · Unit 7', title: '[북챈트1] I Went to the River', vimeo: '571050252' },
+      { id: 'VSK1236', level: 'Level 3 · Unit 7', title: '[북챈트2] I Went to the River', vimeo: '571050286' },
+      { id: 'VSK1237', level: 'Level 3 · Unit 7', title: '[북챈트3] I Went to the River', vimeo: '571050322' },
+      { id: 'VSK1238', level: 'Level 3 · Unit 7', title: '[북챈트1] There Goes a Helicopter', vimeo: '571050488' },
+      { id: 'VSK1239', level: 'Level 3 · Unit 7', title: '[북챈트2] There Goes a Helicopter', vimeo: '571050532' },
+      { id: 'VSK1240', level: 'Level 3 · Unit 7', title: '[북챈트3] There Goes a Helicopter', vimeo: '571050560' }
+    ];
+
+    const app = document.querySelector('.app');
+    const main = document.querySelector('.main');
+    const sidebar = document.getElementById('video-sidebar');
+    const playlistToggle = document.getElementById('playlist-toggle');
+    const drawerBackdrop = document.getElementById('drawer-backdrop');
+    const settingsButton = document.getElementById('settings-button');
+    const settingsPanel = document.getElementById('settings-panel');
+    const drawerMedia = window.matchMedia('(max-width: 1100px), (hover: none) and (pointer: coarse)');
+    const list = document.getElementById('video-list');
+    const count = document.getElementById('selection-count');
+    const playButton = document.getElementById('play-button');
+    const playbackButton = document.getElementById('playback-button');
+    const nextButton = document.getElementById('next-button');
+    const deleteButton = document.getElementById('delete-selected');
+    const restoreButton = document.getElementById('restore-deleted');
+    const repeatCount = document.getElementById('repeat-count');
+    const iframe = document.getElementById('player');
+    const emptyState = document.getElementById('empty-state');
+    const status = document.getElementById('status');
+    let player = null;
+    let currentId = null;
+    let loadedId = null;
+    let changing = false;
+    let finished = false;
+    let round = 1;
+    let activeLevel = 'all';
+    let deletedIds = new Set();
+
+    function sizePlayer() {
+      const style = getComputedStyle(main);
+      const availableWidth = main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const spaceForVideo = main.clientHeight - (drawerMedia.matches ? 125 : 170);
+      const width = Math.max(0, Math.min(availableWidth, 1120, spaceForVideo * 16 / 9));
+      main.style.setProperty('--player-width', `${width}px`);
+    }
+
+    function setPlaybackState(isPlaying) {
+      const label = isPlaying ? '일시 정지' : '재생';
+      playbackButton.setAttribute('aria-label', label);
+      document.getElementById('playback-label').textContent = label;
+      document.getElementById('playback-icon').textContent = isPlaying ? '⏸' : '▶';
+      playbackButton.disabled = !player || !currentId || changing;
+    }
+
+    try {
+      const savedRepeat = localStorage.getItem('tikitoki-repeat-count');
+      if ([...repeatCount.options].some(option => option.value === savedRepeat)) repeatCount.value = savedRepeat;
+      const savedDeleted = JSON.parse(localStorage.getItem('tikitoki-deleted') || '[]');
+      if (Array.isArray(savedDeleted)) deletedIds = new Set(savedDeleted.filter(id => videos.some(video => video.id === id)));
+    } catch (_) {}
+
+    for (const video of videos) {
+      const row = document.createElement('label');
+      row.className = 'video-item';
+      row.dataset.id = video.id;
+      row.dataset.level = video.level;
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = video.id;
+      checkbox.setAttribute('aria-label', `${video.level} ${video.title}`);
+      const body = document.createElement('span');
+      body.className = 'item-body';
+      const title = document.createElement('span');
+      title.className = 'item-title';
+      title.textContent = video.title;
+      const meta = document.createElement('span');
+      meta.className = 'item-meta';
+      meta.textContent = video.id;
+      body.append(title, meta);
+      row.append(checkbox, body);
+      list.append(row);
+    }
+
+    const checkboxes = [...list.querySelectorAll('input[type="checkbox"]')];
+    try {
+      const saved = JSON.parse(localStorage.getItem('tikitoki-selection') || '[]');
+      if (Array.isArray(saved)) checkboxes.forEach(box => { box.checked = saved.includes(box.value); });
+    } catch (_) {}
+
+    function selectedVideos() {
+      return videos.filter(video => !deletedIds.has(video.id) && checkboxes.some(box => box.value === video.id && box.checked));
+    }
+
+    function setPlaylistCollapsed(collapsed) {
+      const isCollapsed = drawerMedia.matches && collapsed;
+      app.classList.toggle('playlist-collapsed', isCollapsed);
+      sidebar.inert = isCollapsed;
+      playlistToggle.setAttribute('aria-expanded', String(!isCollapsed));
+      playlistToggle.setAttribute('aria-label', isCollapsed ? '재생목록 열기' : '재생목록 닫기');
+      playlistToggle.textContent = isCollapsed ? '❯' : '❮';
+      if (isCollapsed) {
+        settingsPanel.hidden = true;
+        settingsButton.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function setActiveLevel(level) {
+      activeLevel = level;
+      for (const tab of document.querySelectorAll('.tab')) {
+        tab.setAttribute('aria-selected', String(tab.dataset.level === level));
+      }
+      for (const row of list.querySelectorAll('.video-item')) {
+        row.hidden = deletedIds.has(row.dataset.id) || (level !== 'all' && row.dataset.level !== level);
+      }
+      list.scrollTop = 0;
+    }
+
+    function updateSelection() {
+      const selected = selectedVideos();
+      count.textContent = `${selected.length}개 선택`;
+      playButton.disabled = selected.length === 0 || changing;
+      playbackButton.disabled = !player || !currentId || changing;
+      nextButton.disabled = !currentId || changing || finished || selected.length === 0;
+      document.getElementById('play-label').textContent = currentId ? '처음부터 재생' : '선택 영상 재생';
+      playButton.setAttribute('aria-label', currentId ? '선택 영상 처음부터 재생' : '선택 영상 재생');
+      deleteButton.disabled = selected.length === 0 || changing;
+      restoreButton.disabled = deletedIds.size === 0;
+      try { localStorage.setItem('tikitoki-selection', JSON.stringify(selected.map(video => video.id))); } catch (_) {}
+      if (!currentId) setStatus(selected.length ? '선택 영상 재생을 누르면 첫 영상부터 시작합니다.' : '영상을 선택하면 재생할 수 있습니다.');
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle('error', isError);
+    }
+
+    function showVideo(video) {
+      currentId = video.id;
+      finished = false;
+      if (activeLevel !== 'all' && activeLevel !== video.level) setActiveLevel(video.level);
+      document.getElementById('level-label').textContent = video.level;
+      document.getElementById('now-title').textContent = video.title;
+      document.getElementById('source-link').href = `https://tikitoki.ebsnurisam.com/direct?IDX=${video.id}`;
+      for (const row of list.querySelectorAll('.video-item')) row.classList.toggle('current', row.dataset.id === video.id);
+      updateSelection();
+      const selected = selectedVideos();
+      const position = selected.findIndex(item => item.id === video.id);
+      setStatus(`${round}회차 · ${position < 0 ? '현재' : `${position + 1} / ${selected.length}번째`} 영상 재생 중`);
+    }
+
+    async function playVideo(video) {
+      if (changing) return;
+      changing = true;
+      playButton.disabled = true;
+      playbackButton.disabled = true;
+      nextButton.disabled = true;
+      showVideo(video);
+      try {
+        if (!window.Vimeo || !window.Vimeo.Player) throw new Error('Vimeo 플레이어를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+        iframe.hidden = false;
+        emptyState.hidden = true;
+        if (!player) {
+          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&loop=0&autopause=0&controls=1&playsinline=1`;
+          player = new Vimeo.Player(iframe);
+          player.on('play', () => setPlaybackState(true));
+          player.on('pause', () => setPlaybackState(false));
+          player.on('ended', () => { setPlaybackState(false); playNext(); });
+          player.on('error', error => setStatus(`영상 재생 오류: ${error.message || '원본 영상의 재생 권한을 확인해 주세요.'}`, true));
+          await player.ready();
+          loadedId = video.id;
+          setPlaybackState(!(await player.getPaused()));
+        } else {
+          if (loadedId === video.id) await player.setCurrentTime(0);
+          else {
+            await player.loadVideo(video.vimeo);
+            loadedId = video.id;
+          }
+          await player.play();
+          setPlaybackState(true);
+        }
+      } catch (error) {
+        setStatus(error.message || '영상을 재생하지 못했습니다. 원본 링크를 확인해 주세요.', true);
+      } finally {
+        changing = false;
+        updateSelection();
+      }
+    }
+
+    function playNext() {
+      if (changing || !currentId) return;
+      const selected = selectedVideos();
+      const currentIndex = videos.findIndex(video => video.id === currentId);
+      const next = selected.find(video => videos.indexOf(video) > currentIndex);
+      if (next) {
+        playVideo(next);
+      } else if (selected.length && (repeatCount.value === '0' || round < Number(repeatCount.value))) {
+        round += 1;
+        playVideo(selected[0]);
+      } else {
+        finished = true;
+        nextButton.disabled = true;
+        setStatus(`${round}회 재생을 마쳤습니다. 다시 보려면 선택 영상 재생을 눌러 주세요.`);
+      }
+    }
+
+    list.addEventListener('change', updateSelection);
+    playlistToggle.addEventListener('click', () => setPlaylistCollapsed(!app.classList.contains('playlist-collapsed')));
+    drawerBackdrop.addEventListener('click', () => setPlaylistCollapsed(true));
+    const handleLayoutChange = () => setPlaylistCollapsed(false);
+    if (drawerMedia.addEventListener) drawerMedia.addEventListener('change', handleLayoutChange);
+    else drawerMedia.addListener(handleLayoutChange);
+    settingsButton.addEventListener('click', () => {
+      settingsPanel.hidden = !settingsPanel.hidden;
+      settingsButton.setAttribute('aria-expanded', String(!settingsPanel.hidden));
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        settingsPanel.hidden = true;
+        settingsButton.setAttribute('aria-expanded', 'false');
+        if (drawerMedia.matches) setPlaylistCollapsed(true);
+      }
+    });
+    document.querySelector('.tabs').addEventListener('click', event => {
+      const tab = event.target.closest('.tab');
+      if (tab) setActiveLevel(tab.dataset.level);
+    });
+    document.getElementById('select-all').addEventListener('click', () => {
+      for (const box of checkboxes) if (!box.closest('.video-item').hidden) box.checked = true;
+      updateSelection();
+    });
+    document.getElementById('clear-all').addEventListener('click', () => { checkboxes.forEach(box => { box.checked = false; }); updateSelection(); });
+    deleteButton.addEventListener('click', () => {
+      const selected = selectedVideos();
+      if (!selected.length) return;
+      for (const video of selected) deletedIds.add(video.id);
+      for (const box of checkboxes) if (deletedIds.has(box.value)) box.checked = false;
+      try { localStorage.setItem('tikitoki-deleted', JSON.stringify([...deletedIds])); } catch (_) {}
+      if (currentId && deletedIds.has(currentId)) {
+        if (player) player.pause().catch(() => {});
+        iframe.hidden = true;
+        emptyState.hidden = false;
+        currentId = null;
+        finished = false;
+        document.getElementById('level-label').textContent = '재생 대기';
+        document.getElementById('now-title').textContent = '선택한 영상 없음';
+        document.getElementById('source-link').href = 'https://tikitoki.ebsnurisam.com/';
+        for (const row of list.querySelectorAll('.video-item')) row.classList.remove('current');
+      }
+      setActiveLevel(activeLevel);
+      updateSelection();
+      setStatus(`${selected.length}개 영상을 목록에서 삭제했습니다.`);
+    });
+    restoreButton.addEventListener('click', () => {
+      const restored = deletedIds.size;
+      deletedIds.clear();
+      try { localStorage.removeItem('tikitoki-deleted'); } catch (_) {}
+      setActiveLevel(activeLevel);
+      updateSelection();
+      setStatus(`${restored}개 영상을 목록에 복원했습니다.`);
+    });
+    repeatCount.addEventListener('change', () => { try { localStorage.setItem('tikitoki-repeat-count', repeatCount.value); } catch (_) {} });
+    playButton.addEventListener('click', () => {
+      const first = selectedVideos()[0];
+      if (first) {
+        round = 1;
+        setPlaylistCollapsed(true);
+        playVideo(first);
+      }
+    });
+    nextButton.addEventListener('click', playNext);
+    playbackButton.addEventListener('click', async () => {
+      if (!player || changing || !currentId) return;
+      try {
+        if (await player.getPaused()) await player.play();
+        else await player.pause();
+      } catch (error) {
+        setStatus(error.message || '재생 상태를 바꾸지 못했습니다.', true);
+      }
+    });
+    window.addEventListener('resize', sizePlayer);
+    if (window.ResizeObserver) new ResizeObserver(sizePlayer).observe(main);
+    sizePlayer();
+    setActiveLevel(activeLevel);
+    setPlaylistCollapsed(false);
+    updateSelection();
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  </script>
+</body>
+</html>
