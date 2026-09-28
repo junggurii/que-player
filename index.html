@@ -259,7 +259,7 @@
         iframe.hidden = false;
         emptyState.hidden = true;
         if (!player) {
-          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&loop=0&autopause=0&controls=1&playsinline=1`;
+          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&loop=0&autopause=0&controls=1&playsinline=1&prefer_mms=0`;
           player = new Vimeo.Player(iframe);
           player.on('play', () => setPlaybackState(true));
           player.on('pause', () => setPlaybackState(false));
