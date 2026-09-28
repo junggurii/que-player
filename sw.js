@@ -1,8 +1,8 @@
-const CACHE_NAME = 'tikitoki-shell-v11';
+const CACHE_NAME = 'tikitoki-shell-v12';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=9',
+  './styles.css?v=12',
   './manifest.webmanifest',
   './assets/storybook-landscape.png',
   './assets/icon-192.png',

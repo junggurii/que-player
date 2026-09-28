@@ -11,7 +11,7 @@
   <link rel="icon" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <title>티키토키 연속 재생</title>
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
   <div class="app">
@@ -127,12 +127,12 @@
     const deleteButton = document.getElementById('delete-selected');
     const restoreButton = document.getElementById('restore-deleted');
     const repeatCount = document.getElementById('repeat-count');
-    const iframe = document.getElementById('player');
+    const playerShell = document.querySelector('.player-shell');
+    let iframe = document.getElementById('player');
     const emptyState = document.getElementById('empty-state');
     const status = document.getElementById('status');
     let player = null;
     let currentId = null;
-    let loadedId = null;
     let changing = false;
     let finished = false;
     let round = 1;
@@ -167,19 +167,27 @@
       if ([...repeatCount.options].some(option => option.value === savedRepeat)) repeatCount.value = savedRepeat;
       const savedDeleted = JSON.parse(localStorage.getItem('tikitoki-deleted') || '[]');
       if (Array.isArray(savedDeleted)) deletedIds = new Set(savedDeleted.filter(id => videos.some(video => video.id === id)));
+      const savedOrder = JSON.parse(localStorage.getItem('tikitoki-order') || '[]');
+      if (Array.isArray(savedOrder)) {
+        const positions = new Map(savedOrder.map((id, index) => [id, index]));
+        videos.sort((a, b) => (positions.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (positions.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+      }
     } catch (_) {}
 
+    const rows = new Map();
     for (const video of videos) {
-      const row = document.createElement('label');
+      const row = document.createElement('div');
       row.className = 'video-item';
       row.dataset.id = video.id;
       row.dataset.level = video.level;
       const checkbox = document.createElement('input');
+      checkbox.id = `select-${video.id}`;
       checkbox.type = 'checkbox';
       checkbox.value = video.id;
       checkbox.setAttribute('aria-label', `${video.level} ${video.title}`);
-      const body = document.createElement('span');
+      const body = document.createElement('label');
       body.className = 'item-body';
+      body.htmlFor = checkbox.id;
       const title = document.createElement('span');
       title.className = 'item-title';
       title.textContent = video.title;
@@ -187,8 +195,20 @@
       meta.className = 'item-meta';
       meta.textContent = video.id;
       body.append(title, meta);
-      row.append(checkbox, body);
+      const actions = document.createElement('span');
+      actions.className = 'move-actions';
+      for (const [direction, symbol, label] of [['up', '↑', '위로'], ['down', '↓', '아래로']]) {
+        const button = document.createElement('button');
+        button.className = 'move-button';
+        button.type = 'button';
+        button.dataset.move = direction;
+        button.setAttribute('aria-label', `${video.title} ${label} 이동`);
+        button.textContent = symbol;
+        actions.append(button);
+      }
+      row.append(checkbox, body, actions);
       list.append(row);
+      rows.set(video.id, row);
     }
 
     const checkboxes = [...list.querySelectorAll('input[type="checkbox"]')];
@@ -199,6 +219,32 @@
 
     function selectedVideos() {
       return videos.filter(video => !deletedIds.has(video.id) && checkboxes.some(box => box.value === video.id && box.checked));
+    }
+
+    function updateMoveButtons() {
+      for (const video of videos) {
+        const peers = videos.filter(item => item.level === video.level && !deletedIds.has(item.id));
+        const position = peers.findIndex(item => item.id === video.id);
+        const row = rows.get(video.id);
+        row.querySelector('[data-move="up"]').disabled = changing || position <= 0;
+        row.querySelector('[data-move="down"]').disabled = changing || position < 0 || position === peers.length - 1;
+      }
+    }
+
+    function moveVideo(id, direction) {
+      const video = videos.find(item => item.id === id);
+      if (!video || changing) return;
+      const peers = videos.filter(item => item.level === video.level && !deletedIds.has(item.id));
+      const position = peers.findIndex(item => item.id === id);
+      const neighbor = peers[position + (direction === 'up' ? -1 : 1)];
+      if (!neighbor) return;
+      const from = videos.indexOf(video);
+      const to = videos.indexOf(neighbor);
+      [videos[from], videos[to]] = [videos[to], videos[from]];
+      list.append(...videos.map(item => rows.get(item.id)));
+      try { localStorage.setItem('tikitoki-order', JSON.stringify(videos.map(item => item.id))); } catch (_) {}
+      updateSelection();
+      rows.get(id).querySelector(`[data-move="${direction}"]`).focus();
     }
 
     function setPlaylistCollapsed(collapsed) {
@@ -236,6 +282,7 @@
       playButton.setAttribute('aria-label', currentId ? '선택 영상 처음부터 재생' : '선택 영상 재생');
       deleteButton.disabled = selected.length === 0 || changing;
       restoreButton.disabled = deletedIds.size === 0;
+      updateMoveButtons();
       try { localStorage.setItem('tikitoki-selection', JSON.stringify(selected.map(video => video.id))); } catch (_) {}
       if (!currentId) setStatus(selected.length ? '선택 영상 재생을 누르면 첫 영상부터 시작합니다.' : '영상을 선택하면 재생할 수 있습니다.');
     }
@@ -243,6 +290,12 @@
     function setStatus(message, isError = false) {
       status.textContent = message;
       status.classList.toggle('error', isError);
+    }
+
+    function playbackErrorMessage(error) {
+      return error.name === 'NotAllowedError'
+        ? '자동 재생이 차단되었습니다. 저전력 모드를 끄거나 영상의 재생 버튼을 눌러 주세요.'
+        : error.message || '영상을 재생하지 못했습니다. 원본 링크를 확인해 주세요.';
     }
 
     function showVideo(video) {
@@ -269,33 +322,30 @@
       showVideo(video);
       try {
         if (!window.Vimeo || !window.Vimeo.Player) throw new Error('Vimeo 플레이어를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
-        iframe.hidden = false;
-        emptyState.hidden = true;
-        if (!player) {
-          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&muted=1&loop=0&autopause=0&controls=1&playsinline=1&prefer_mms=0`;
-          player = new Vimeo.Player(iframe);
-          player.on('play', () => setPlaybackState(true));
-          player.on('pause', () => setPlaybackState(false));
-          player.on('volumechange', event => setSoundState(!event.muted));
-          player.on('ended', () => { setPlaybackState(false); playNext(); });
-          player.on('error', error => setStatus(`영상 재생 오류: ${error.message || '원본 영상의 재생 권한을 확인해 주세요.'}`, true));
-          await player.ready();
-          loadedId = video.id;
-          await player.play();
-          setPlaybackState(true);
-        } else {
-          await player.setMuted(true);
-          setSoundState(false);
-          if (loadedId === video.id) await player.setCurrentTime(0);
-          else {
-            await player.loadVideo(video.vimeo);
-            loadedId = video.id;
-          }
-          await player.play();
-          setPlaybackState(true);
+        if (player) {
+          await player.destroy();
+          player = null;
         }
+        iframe.remove();
+        iframe = document.createElement('iframe');
+        iframe.id = 'player';
+        iframe.title = '티키토키 영상 플레이어';
+        iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+        iframe.allowFullscreen = true;
+        playerShell.prepend(iframe);
+        iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&muted=1&loop=0&autopause=0&controls=1&playsinline=1&prefer_mms=0`;
+        emptyState.hidden = true;
+        setSoundState(false);
+        setPlaybackState(false);
+        player = new Vimeo.Player(iframe);
+        player.on('play', () => setPlaybackState(true));
+        player.on('pause', () => setPlaybackState(false));
+        player.on('volumechange', event => setSoundState(!event.muted));
+        player.on('ended', () => { setPlaybackState(false); playNext(); });
+        player.on('error', error => setStatus(playbackErrorMessage(error), true));
+        await player.ready();
       } catch (error) {
-        setStatus(error.message || '영상을 재생하지 못했습니다. 원본 링크를 확인해 주세요.', true);
+        setStatus(playbackErrorMessage(error), true);
       } finally {
         changing = false;
         updateSelection();
@@ -320,6 +370,10 @@
     }
 
     list.addEventListener('change', updateSelection);
+    list.addEventListener('click', event => {
+      const button = event.target.closest('[data-move]');
+      if (button) moveVideo(button.closest('.video-item').dataset.id, button.dataset.move);
+    });
     playlistToggle.addEventListener('click', () => setPlaylistCollapsed(!app.classList.contains('playlist-collapsed')));
     drawerBackdrop.addEventListener('click', () => setPlaylistCollapsed(true));
     const handleLayoutChange = () => setPlaylistCollapsed(false);
