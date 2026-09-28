@@ -66,6 +66,9 @@
           </div>
         </div>
         <div class="controls">
+          <button class="secondary" id="sound-button" type="button" aria-label="소리 켜기" disabled>
+            <span class="desktop-label" id="sound-label">소리 켜기</span><span class="mobile-icon sound-icon" id="sound-icon" aria-hidden="true">🔇</span>
+          </button>
           <button class="secondary" id="playback-button" type="button" aria-label="재생" disabled>
             <span class="desktop-label" id="playback-label">재생</span><span class="mobile-icon playback-icon" id="playback-icon" aria-hidden="true">▶</span>
           </button>
@@ -118,6 +121,7 @@
     const list = document.getElementById('video-list');
     const count = document.getElementById('selection-count');
     const playButton = document.getElementById('play-button');
+    const soundButton = document.getElementById('sound-button');
     const playbackButton = document.getElementById('playback-button');
     const nextButton = document.getElementById('next-button');
     const deleteButton = document.getElementById('delete-selected');
@@ -149,6 +153,13 @@
       document.getElementById('playback-label').textContent = label;
       document.getElementById('playback-icon').textContent = isPlaying ? '⏸' : '▶';
       playbackButton.disabled = !player || !currentId || changing;
+    }
+
+    function setSoundState(isAudible) {
+      const label = isAudible ? '소리 끄기' : '소리 켜기';
+      soundButton.setAttribute('aria-label', label);
+      document.getElementById('sound-label').textContent = label;
+      document.getElementById('sound-icon').textContent = isAudible ? '🔊' : '🔇';
     }
 
     try {
@@ -218,6 +229,7 @@
       const selected = selectedVideos();
       count.textContent = `${selected.length}개 선택`;
       playButton.disabled = selected.length === 0 || changing;
+      soundButton.disabled = !player || !currentId || changing;
       playbackButton.disabled = !player || !currentId || changing;
       nextButton.disabled = !currentId || changing || finished || selected.length === 0;
       document.getElementById('play-label').textContent = currentId ? '처음부터 재생' : '선택 영상 재생';
@@ -251,6 +263,7 @@
       if (changing) return;
       changing = true;
       playButton.disabled = true;
+      soundButton.disabled = true;
       playbackButton.disabled = true;
       nextButton.disabled = true;
       showVideo(video);
@@ -259,16 +272,20 @@
         iframe.hidden = false;
         emptyState.hidden = true;
         if (!player) {
-          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&loop=0&autopause=0&controls=1&playsinline=1&prefer_mms=0`;
+          iframe.src = `https://player.vimeo.com/video/${video.vimeo}?autoplay=1&muted=1&loop=0&autopause=0&controls=1&playsinline=1&prefer_mms=0`;
           player = new Vimeo.Player(iframe);
           player.on('play', () => setPlaybackState(true));
           player.on('pause', () => setPlaybackState(false));
+          player.on('volumechange', event => setSoundState(!event.muted));
           player.on('ended', () => { setPlaybackState(false); playNext(); });
           player.on('error', error => setStatus(`영상 재생 오류: ${error.message || '원본 영상의 재생 권한을 확인해 주세요.'}`, true));
           await player.ready();
           loadedId = video.id;
-          setPlaybackState(!(await player.getPaused()));
+          await player.play();
+          setPlaybackState(true);
         } else {
+          await player.setMuted(true);
+          setSoundState(false);
           if (loadedId === video.id) await player.setCurrentTime(0);
           else {
             await player.loadVideo(video.vimeo);
@@ -367,6 +384,16 @@
       }
     });
     nextButton.addEventListener('click', playNext);
+    soundButton.addEventListener('click', async () => {
+      if (!player || changing || !currentId) return;
+      try {
+        const muted = await player.getMuted();
+        await player.setMuted(!muted);
+        setSoundState(muted);
+      } catch (error) {
+        setStatus(error.message || '소리 설정을 바꾸지 못했습니다.', true);
+      }
+    });
     playbackButton.addEventListener('click', async () => {
       if (!player || changing || !currentId) return;
       try {
